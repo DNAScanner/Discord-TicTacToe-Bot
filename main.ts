@@ -14,6 +14,8 @@ import {} from "npm:@discordjs/ws";
 import {load} from "https://deno.land/std@0.224.0/dotenv/mod.ts";
 import {APIMessageComponentEmoji, ButtonStyle} from "npm:discord-api-types/v10";
 
+const inviteUrl = "https://discord.com/oauth2/authorize?client_id=1007248411583586365";
+
 type AwaitMessageComponentResult = {
 	readonly deferUpdate: () => Promise<void>;
 	readonly customId: string;
@@ -299,6 +301,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
 				],
 				components: [
 					new ActionRowBuilder().addComponents([
+						new ButtonBuilder() //
+							.setLabel("Invite")
+							.setStyle(ButtonStyle.Link)
+							.setURL(inviteUrl)
+							.setEmoji({id: "1255138718331830312"}),
+
 						new ButtonBuilder() //
 							.setLabel("GitHub")
 							.setStyle(ButtonStyle.Link)
