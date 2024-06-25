@@ -2,6 +2,11 @@
 
 This is a simple TicTacToe bot for Discord made using [discord.js](https://discordjs.guide). For the board, I used Discord's Buttons and Message Components.
 
+## Screenshots
+![alt text](docs/1.png)
+![alt text](docs/2.png)
+![alt text](docs/3.png)
+
 ## Setup
 
 1. Clone the repository
