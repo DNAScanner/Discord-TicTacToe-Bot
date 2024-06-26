@@ -320,186 +320,161 @@ client.on(Events.InteractionCreate, async (interaction) => {
 		}
 
 		case "tictactoe": {
-			const publicGame = (interaction.options.get("public")?.value || false) as boolean;
-			const difficulty = (interaction.options.get("difficulty")?.value || "medium") as string;
+			try {
+				const publicGame = (interaction.options.get("public")?.value || false) as boolean;
+				const difficulty = (interaction.options.get("difficulty")?.value || "medium") as string;
 
-			await interaction.reply({ephemeral: !publicGame, content: "Initializing game..."});
+				await interaction.reply({ephemeral: !publicGame, content: "Initializing game..."});
 
-			// Initialize game
-			const board = [
-				//
-				[0, 0, 0],
-				[0, 0, 0],
-				[0, 0, 0],
-			];
+				// Initialize game
+				const board = [
+					//
+					[0, 0, 0],
+					[0, 0, 0],
+					[0, 0, 0],
+				];
 
-			// User is always X or 1, bot is always O or 2
-			let currentPlayer = 1;
+				// User is always X or 1, bot is always O or 2
+				let currentPlayer = 1;
 
-			// Game loop
-			while (true) {
-				// Display board
-				const generateBoardButtons = (board: number[][], restartButton?: boolean) => {
-					const rows: ActionRowBuilder<AnyComponentBuilder>[] = [];
+				// Game loop
+				while (true) {
+					// Display board
+					const generateBoardButtons = (board: number[][], restartButton?: boolean) => {
+						const rows: ActionRowBuilder<AnyComponentBuilder>[] = [];
 
-					for (const row in board) {
-						const dRow = board[row];
-						const buttons: ButtonBuilder[] = [];
+						for (const row in board) {
+							const dRow = board[row];
+							const buttons: ButtonBuilder[] = [];
 
-						for (const cell in board[row]) {
-							const dCell = dRow[cell];
+							for (const cell in board[row]) {
+								const dCell = dRow[cell];
 
-							const emote: APIMessageComponentEmoji = {};
+								const emote: APIMessageComponentEmoji = {};
 
-							switch (dCell) {
-								case 0:
-									emote.id = "1254851573536915506";
-									break;
+								switch (dCell) {
+									case 0:
+										emote.id = "1254851573536915506";
+										break;
 
-								case 1:
-									emote.id = "1254851574916841502";
-									break;
+									case 1:
+										emote.id = "1254851574916841502";
+										break;
 
-								case 2:
-									emote.id = "1254851576506613832";
-									break;
+									case 2:
+										emote.id = "1254851576506613832";
+										break;
+								}
+
+								buttons.push(
+									new ButtonBuilder() //
+										.setCustomId(`field-${row}-${cell}`)
+										// .setLabel(dCell === 0 ? "-" : dCell === 1 ? "X" : "O".toString())
+										.setEmoji(emote)
+										.setStyle(ButtonStyle.Primary)
+										.setDisabled(dCell !== 0 || currentPlayer !== 1 || restartButton === true)
+								);
 							}
 
-							buttons.push(
-								new ButtonBuilder() //
-									.setCustomId(`field-${row}-${cell}`)
-									// .setLabel(dCell === 0 ? "-" : dCell === 1 ? "X" : "O".toString())
-									.setEmoji(emote)
-									.setStyle(ButtonStyle.Primary)
-									.setDisabled(dCell !== 0 || currentPlayer !== 1 || restartButton === true)
-							);
+							rows.push(new ActionRowBuilder().addComponents(buttons));
 						}
 
-						rows.push(new ActionRowBuilder().addComponents(buttons));
-					}
+						if (restartButton) rows.push(new ActionRowBuilder().addComponents([new ButtonBuilder().setCustomId("restart").setLabel("Restart").setStyle(ButtonStyle.Danger)]));
 
-					if (restartButton) rows.push(new ActionRowBuilder().addComponents([new ButtonBuilder().setCustomId("restart").setLabel("Restart").setStyle(ButtonStyle.Danger)]));
+						return rows;
+					};
 
-					return rows;
-				};
+					const response = await interaction.editReply({
+						content: "**" + (currentPlayer === 1 ? "Please make your move!" : "I'm thinking...") + "**",
+						components: [...generateBoardButtons(board)],
+					});
 
-				const response = await interaction.editReply({
-					content: "**" + (currentPlayer === 1 ? "Please make your move!" : "I'm thinking...") + "**",
-					components: [...generateBoardButtons(board)],
-				});
+					if (currentPlayer === 1) {
+						// deno-lint-ignore no-explicit-any
+						const filter = (i: any) => i.user.id === interaction.user.id && i.customId.startsWith("field-");
 
-				if (currentPlayer === 1) {
-					// deno-lint-ignore no-explicit-any
-					const filter = (i: any) => i.user.id === interaction.user.id && i.customId.startsWith("field-");
+						// Wait for user input
+						try {
+							const choice = (await response.awaitMessageComponent({
+								filter,
+								time: 60000,
+							})) as AwaitMessageComponentResult;
 
-					// Wait for user input
-					try {
-						const choice = (await response.awaitMessageComponent({
-							filter,
-							time: 60000,
-						})) as AwaitMessageComponentResult;
+							await choice.deferUpdate();
 
-						await choice.deferUpdate();
-
-						// Parse choice
-						const [_, row, cell] = choice.customId.split("-").map(Number);
-						board[row][cell] = currentPlayer;
-					} catch {
-						await interaction.editReply({content: "You took too long to make your move!", components: []});
-						break;
-					}
-				} else {
-					switch (difficulty) {
-						case "easy": {
-							// Use center and random
-							let placeAt = [0, 0];
-
-							if (board[1][1] === 0) {
-								placeAt = [1, 1];
-							} else {
-								placeAt = chooseCell.random(board);
-							}
-
-							const [row, cell] = placeAt;
+							// Parse choice
+							const [_, row, cell] = choice.customId.split("-").map(Number);
 							board[row][cell] = currentPlayer;
-
+						} catch {
+							await interaction.editReply({content: "You took too long to make your move!", components: []});
 							break;
 						}
+					} else {
+						switch (difficulty) {
+							case "easy": {
+								// Use center and random
+								let placeAt = [0, 0];
 
-						case "medium": {
-							// Use canWin, win, canPreventUserWin, preventUserWin, center or random
-							let placeAt = [0, 0];
+								if (board[1][1] === 0) {
+									placeAt = [1, 1];
+								} else {
+									placeAt = chooseCell.random(board);
+								}
 
-							/*  */ if (chooseCell.canWin(board)) {
-								placeAt = chooseCell.win(board);
-							} else if (chooseCell.canPreventUserWin(board)) {
-								placeAt = chooseCell.preventUserWin(board);
-							} else if (board[1][1] === 0) {
-								placeAt = [1, 1];
-							} else {
-								placeAt = chooseCell.random(board);
+								const [row, cell] = placeAt;
+								board[row][cell] = currentPlayer;
+
+								break;
 							}
 
-							const [row, cell] = placeAt;
-							board[row][cell] = currentPlayer;
+							case "medium": {
+								// Use canWin, win, canPreventUserWin, preventUserWin, center or random
+								let placeAt = [0, 0];
 
-							break;
-						}
+								/*  */ if (chooseCell.canWin(board)) {
+									placeAt = chooseCell.win(board);
+								} else if (chooseCell.canPreventUserWin(board)) {
+									placeAt = chooseCell.preventUserWin(board);
+								} else if (board[1][1] === 0) {
+									placeAt = [1, 1];
+								} else {
+									placeAt = chooseCell.random(board);
+								}
 
-						case "hard": {
-							let placeAt = [0, 0];
+								const [row, cell] = placeAt;
+								board[row][cell] = currentPlayer;
 
-							/*  */ if (chooseCell.canWin(board)) {
-								placeAt = chooseCell.win(board);
-							} else if (chooseCell.canPreventUserWin(board)) {
-								placeAt = chooseCell.preventUserWin(board);
-							} else if (board[1][1] === 0) {
-								placeAt = [1, 1];
-							} else if (board[0][0] === 0 || board[0][2] === 0 || board[2][0] === 0 || board[2][2] === 0) {
-								placeAt = chooseCell.corner(board);
-							} else if (board[0][1] === 0 || board[1][0] === 0 || board[1][2] === 0 || board[2][1] === 0) {
-								placeAt = chooseCell.edge(board);
-							} else {
-								placeAt = chooseCell.random(board);
+								break;
 							}
 
-							const [row, cell] = placeAt;
-							board[row][cell] = currentPlayer;
+							case "hard": {
+								let placeAt = [0, 0];
 
-							break;
+								/*  */ if (chooseCell.canWin(board)) {
+									placeAt = chooseCell.win(board);
+								} else if (chooseCell.canPreventUserWin(board)) {
+									placeAt = chooseCell.preventUserWin(board);
+								} else if (board[1][1] === 0) {
+									placeAt = [1, 1];
+								} else if (board[0][0] === 0 || board[0][2] === 0 || board[2][0] === 0 || board[2][2] === 0) {
+									placeAt = chooseCell.corner(board);
+								} else if (board[0][1] === 0 || board[1][0] === 0 || board[1][2] === 0 || board[2][1] === 0) {
+									placeAt = chooseCell.edge(board);
+								} else {
+									placeAt = chooseCell.random(board);
+								}
+
+								const [row, cell] = placeAt;
+								board[row][cell] = currentPlayer;
+
+								break;
+							}
 						}
 					}
-				}
 
-				// Check if the board is full => draw
-				if (!board.flat().includes(0)) {
-					await interaction.editReply({content: "**" + pickRandomPhrase("draw") + "**", components: [...generateBoardButtons(board, true)]});
-
-					try {
-						const restartChoice = (await response.awaitMessageComponent({
-							// deno-lint-ignore no-explicit-any
-							filter: (i: any) => i.user.id === interaction.user.id && i.customId === "restart",
-							time: 60000,
-						})) as AwaitMessageComponentResult;
-
-						await restartChoice.deferUpdate();
-
-						// Reset board
-						for (const row of board) row.fill(0);
-
-						continue;
-					} catch {
-						await interaction.editReply({content: "You took too long to restart the game!", components: []});
-						break;
-					}
-				}
-
-				// Check if someone won
-				for (const combination of winningCombinations) {
-					const [a, b, c] = combination.map(([row, cell]) => board[row][cell]);
-
-					if (a === b && b === c && a !== 0) {
-						await interaction.editReply({content: "**" + pickRandomPhrase(currentPlayer === 1 ? "user" : "bot") + "**", components: [...generateBoardButtons(board, true)]});
+					// Check if the board is full => draw
+					if (!board.flat().includes(0)) {
+						await interaction.editReply({content: "**" + pickRandomPhrase("draw") + "**", components: [...generateBoardButtons(board, true)]});
 
 						try {
 							const restartChoice = (await response.awaitMessageComponent({
@@ -519,10 +494,39 @@ client.on(Events.InteractionCreate, async (interaction) => {
 							break;
 						}
 					}
-				}
 
-				// Switch players
-				currentPlayer = currentPlayer === 1 ? 2 : 1;
+					// Check if someone won
+					for (const combination of winningCombinations) {
+						const [a, b, c] = combination.map(([row, cell]) => board[row][cell]);
+
+						if (a === b && b === c && a !== 0) {
+							await interaction.editReply({content: "**" + pickRandomPhrase(currentPlayer === 1 ? "user" : "bot") + "**", components: [...generateBoardButtons(board, true)]});
+
+							try {
+								const restartChoice = (await response.awaitMessageComponent({
+									// deno-lint-ignore no-explicit-any
+									filter: (i: any) => i.user.id === interaction.user.id && i.customId === "restart",
+									time: 60000,
+								})) as AwaitMessageComponentResult;
+
+								await restartChoice.deferUpdate();
+
+								// Reset board
+								for (const row of board) row.fill(0);
+
+								continue;
+							} catch {
+								await interaction.editReply({content: "You took too long to restart the game!", components: []});
+								break;
+							}
+						}
+					}
+
+					// Switch players
+					currentPlayer = currentPlayer === 1 ? 2 : 1;
+				}
+			} catch {
+				null;
 			}
 		}
 	}
